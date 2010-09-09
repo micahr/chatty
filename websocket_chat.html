@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.4/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css" />
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.4/jquery-ui.min.js"></script>
+<script type="text/javascript">
+var WebSocketDispatch = function(url){
+  var conn = new WebSocket(url);
+
+  var callbacks = {};
+
+  this.bind = function(event_name, callback){
+    callbacks[event_name] = callbacks[event_name] || [];
+    callbacks[event_name].push(callback);
+    return this;// chainable
+  };
+
+  this.send = function(event_name, event_data){
+    var payload = JSON.stringify({event:event_name, data: event_data});
+    conn.send( payload ); // <= send JSON data to socket server
+    return this;
+  };
+
+  // dispatch to the right handlers
+  conn.onmessage = function(evt){
+    var json;
+	json = JSON.parse(evt.data)
+    dispatch(json.event, json.data)
+  };
+
+  conn.onclose = function(){dispatch('close',null)}
+  conn.onopen = function(){dispatch('open',null)}
+
+  var dispatch = function(event_name, message){
+    var chain = callbacks[event_name];
+    if(typeof chain == 'undefined') return; // no callbacks for this event
+    for(var i = 0; i < chain.length; i++){
+      chain[i]( message )
+    }
+  }
+};
+</script>
+<script>
+window.onload = function() {
+var data = {};
+var s = new WebSocketDispatch("ws://127.0.0.1:7000/chat");
+/*s.bind("open", function() {
+	s.send('new_participant',{'data':'New participant joined'});
+});*/
+s.bind("new_message", function(e) {
+	log(e.message);
+});
+s.bind("error", function(e){
+	log("ERROR!");
+});
+s.bind("close", function(e){
+	log("Closing Will Robinson...");
+});
+s.bind("add_user", function(e){
+	par_log(e.username);
+});
+s.bind("remove_user", function(e){
+	$("#user-"+e.username).remove();
+});
+var log = function(data){
+	$("#chat").append("<div>" + data + "</div>");
+}
+var par_log = function(data){
+	$("#participants").append("<div id='user-"+data+"'>" + data + "</div>");
+}
+$('#chatform').submit(function (evt) {
+	var line = $('#chatform [type=text]').val()
+	$('#chatform [type=text]').val('')
+	s.send('new_message',{'message':line});
+	return false;
+});
+$("#dialog").dialog({
+	modal:true,
+	closeOnEscape:false,
+	buttons:{"Ok":function(){
+		var username = $("#dialog #username").val();
+		s.send('add_user',{'username':username});
+		$(this).dialog("close");
+	}},
+});
+};
+</script>
+</head>
+<body>
+<h3>Chat!</h3>
+<p>(Only tested in Chrome)</p>
+<div id="chat" style="width: 45em; height: 20em; float:left; overflow:auto; border: 1px solid black">
+</div>
+<div id="participants" style="width:13em; height:20em; margin-left:2em; float:left; overflow:auto;border:1px dashed #333;">
+</div>
+<form id="chatform" style="float:left;clear:left;display:block;">
+<label for="chat_text">Enter Text:</label> <input id="chat_text" type="text" />
+<input type="submit" />
+</form>
+<div id="dialog" style="display:none;">
+	<form id="usernameform">
+		<label for="username">Username:</label> <input id="username" type="text" />
+	</form>
+</div>
+</body>
+</html>
