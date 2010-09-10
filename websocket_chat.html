@@ -49,7 +49,7 @@ var s = new WebSocketDispatch("ws://127.0.0.1:7000/chat");
 	s.send('new_participant',{'data':'New participant joined'});
 });*/
 s.bind("new_message", function(e) {
-	log(e.message);
+	log(e.username, e.message);
 });
 s.bind("error", function(e){
 	log("ERROR!");
@@ -63,26 +63,37 @@ s.bind("add_user", function(e){
 s.bind("remove_user", function(e){
 	$("#user-"+e.username).remove();
 });
-var log = function(data){
-	$("#chat").append("<div>" + data + "</div>");
+var log = function(username, data){
+	$("#chat").append("<div><span class='username'>"+ username +": </span>" + data + "</div>");
 }
 var par_log = function(data){
 	$("#participants").append("<div id='user-"+data+"'>" + data + "</div>");
 }
+var set_username = function(){
+	var username = $("#dialog #username").val();
+	s.send('add_user',
+		{'username': username}
+	);
+	$("#chat").data("username", username);
+}
 $('#chatform').submit(function (evt) {
 	var line = $('#chatform [type=text]').val()
 	$('#chatform [type=text]').val('')
-	s.send('new_message',{'message':line});
+	s.send('new_message',{'message':line, 'username':$("#chat").data("username")});
 	return false;
 });
 $("#dialog").dialog({
 	modal:true,
 	closeOnEscape:false,
 	buttons:{"Ok":function(){
-		var username = $("#dialog #username").val();
-		s.send('add_user',{'username':username});
+		set_username();
 		$(this).dialog("close");
 	}},
+});
+$("#usernameform").submit(function(){
+	set_username();
+	$("#dialog").dialog("close");
+	return false;
 });
 };
 </script>
